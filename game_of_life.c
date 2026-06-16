@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <ncurses.h>
+#include <stdio.h>
 #include <unistd.h>
 
 #define WIDTH 80
@@ -21,14 +22,27 @@ void clear_board(int board[HEIGHT][WIDTH]) {
 
 int is_alive_char(int c) { return (c == LIVE); }
 
-void load_from_stdin(int board[HEIGHT][WIDTH]) {
+void load_from_stream(FILE *input, int board[HEIGHT][WIDTH]) {
     char line[128];
 
-    for (int y = 0; y < HEIGHT && fgets(line, sizeof(line), stdin); ++y) {
+    for (int y = 0; y < HEIGHT && fgets(line, sizeof(line), input); ++y) {
         for (int x = 0; x < WIDTH && line[x] != '\0' && line[x] != '\n'; ++x) {
             board[y][x] = is_alive_char(line[x]);
         }
     }
+}
+
+int load_from_file(const char *path, int board[HEIGHT][WIDTH]) {
+    int result = 0;
+    FILE *file = fopen(path, "r");
+
+    if (file) {
+        load_from_stream(file, board);
+        fclose(file);
+        result = 1;
+    }
+
+    return result;
 }
 
 int count_neighbors(int board[HEIGHT][WIDTH], int y, int x) {
@@ -127,8 +141,10 @@ void attach_tty() {
     tty_out = fopen("/dev/tty", "w");
 
     if (tty_in) {
-        int c;
-        while ((c = getchar()) != '\n' && c != EOF) {
+        if (!isatty(STDIN_FILENO)) {
+            int c;
+            while ((c = getchar()) != '\n' && c != EOF) {
+            }
         }
 
         if (dup2(fileno(tty_in), STDIN_FILENO) != -1) {
@@ -204,14 +220,26 @@ void full_ncurses_cleanup(SCREEN *screen) {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     int cur[HEIGHT][WIDTH];
     int next[HEIGHT][WIDTH];
     int exit_code;
 
     clear_board(cur);
     clear_board(next);
-    load_from_stdin(cur);
+
+    if (argc == 1) {
+        load_from_stream(stdin, cur);
+    } else if (argc == 2) {
+        if (!load_from_file(argv[1], cur)) {
+            fprintf(stderr, "Cannot open file: %s\n", argv[1]);
+            return 1;
+        }
+    } else {
+        fprintf(stderr, "Usage: %s [pattern_file]\n", argv[0]);
+        return 1;
+    }
+
     attach_tty();
 
     SCREEN *screen = init_ncurses();
