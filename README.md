@@ -1,130 +1,131 @@
 # Game of Life
 
-Терминальная реализация клеточного автомата **Conway's Game of Life** на языке C.
-Проект выполнен в рамках группового задания **School 21** командой из двух человек.
-У обоих участников уже был опыт написания кода, поэтому основной акцент был сделан
-не только на рабочей симуляции, но и на структуре программы, интерактивном управлении
-и аккуратной работе с терминалом.
+A terminal implementation of **Conway's Game of Life** cellular automaton in C.
+This project was completed as a group assignment at **School 21** by a team of two.
+Both team members already had programming experience, so the focus was not only on a
+working simulation, but also on program structure, interactive controls, and careful
+terminal handling.
 
-## Как это выглядит
+## What it looks like
 
-![Начальное состояние игры](img/game-of-life-start.png)
+![Initial game state](img/game-of-life-start.png)
 
-![Симуляция через несколько поколений](img/game-of-life-running.png)
+![Simulation after several generations](img/game-of-life-running.png)
 
-## Идея проекта
+## Project idea
 
-Game of Life - это симуляция жизни клеток на двумерном поле. Каждая клетка может быть
-живой или мертвой, а новое поколение рассчитывается по простым правилам:
+Game of Life simulates cells living on a two-dimensional grid. Each cell can be alive
+or dead, and the next generation is calculated using a few simple rules:
 
-- живая клетка выживает, если у нее 2 или 3 живых соседа;
-- живая клетка умирает от одиночества или перенаселения в остальных случаях;
-- мертвая клетка становится живой, если рядом с ней ровно 3 живых соседа.
+- a live cell survives if it has 2 or 3 live neighbors;
+- a live cell dies of underpopulation or overpopulation in all other cases;
+- a dead cell becomes alive if it has exactly 3 live neighbors.
 
-Несмотря на простые правила, из них появляются устойчивые фигуры, движущиеся паттерны
-и сложное поведение.
+Despite their simplicity, these rules produce stable structures, moving patterns, and
+complex behavior.
 
-## Возможности
+## Features
 
-- поле фиксированного размера `80x25`;
-- отрисовка в терминале через `ncurses`;
-- интерактивное изменение скорости симуляции;
-- выход из игры по клавише `Space`;
-- циклические границы поля: клетки с края взаимодействуют с клетками на противоположной стороне;
-- загрузка начального состояния из файла или из стандартного ввода;
-- 5 готовых тестовых паттернов: `test1.txt` - `test5.txt`.
+- fixed-size `80x25` grid;
+- terminal rendering with `ncurses`;
+- interactive control of the simulation speed;
+- exit with the `Space` key;
+- wraparound grid edges: cells at an edge interact with cells on the opposite side;
+- load an initial state from a file or standard input;
+- 5 ready-made test patterns: `test1.txt` through `test5.txt`.
 
-## Использованные библиотеки
+## Libraries used
 
-- `ncurses.h` - управление терминальным экраном, отрисовка поля и неблокирующее чтение клавиш;
-- `stdio.h` - чтение файлов, работа со стандартным вводом/выводом, сообщения об ошибках;
-- `unistd.h` - POSIX-функции для работы с файловыми дескрипторами терминала.
+- `ncurses.h` - terminal screen control, grid rendering, and non-blocking key input;
+- `stdio.h` - file and standard input/output operations, and error messages;
+- `unistd.h` - POSIX functions for working with terminal file descriptors.
 
-Проект не использует `system()` и не требует динамического выделения памяти.
+The project does not use `system()` and does not require dynamic memory allocation.
 
-## Что интересного в реализации
+## Implementation details
 
-### Тороидальное поле
+### Toroidal grid
 
-Поле замкнуто по краям: если клетка находится на границе, ее соседи считаются с другой
-стороны поля. Это реализовано через остаток от деления:
+The grid wraps around at its edges: when a cell is on an edge, its neighbors are
+counted from the opposite side of the grid. This is implemented with the modulo
+operator:
 
 ```c
 int new_y = (y + delta_y + HEIGHT) % HEIGHT;
 int new_x = (x + delta_x + WIDTH) % WIDTH;
 ```
 
-Такой подход убирает отдельные условия для углов и краев поля.
+This avoids separate conditions for corners and edges.
 
-### Двойной буфер
+### Double buffering
 
-Для расчета следующего поколения используются два массива:
+Two arrays are used to calculate the next generation:
 
-- `cur` - текущее состояние поля;
-- `next` - новое состояние поля.
+- `cur` - the current state of the grid;
+- `next` - the new state of the grid.
 
-Это важно, потому что все клетки одного поколения должны обновляться одновременно.
-Если менять `cur` сразу во время обхода, новые значения начали бы влиять на соседние
-клетки в том же шаге, и правила Game of Life работали бы неправильно.
+This matters because all cells in a generation must update simultaneously. If `cur`
+were changed while iterating over it, the new values would start affecting neighboring
+cells in the same step, and the Game of Life rules would no longer work correctly.
 
-### Неблокирующее управление
+### Non-blocking controls
 
-`ncurses` настроен через `nodelay(stdscr, TRUE)`, поэтому программа не останавливает
-симуляцию в ожидании нажатия клавиши. На каждом кадре она проверяет, была ли нажата
-клавиша, применяет действие и продолжает расчет.
+`ncurses` is configured with `nodelay(stdscr, TRUE)`, so the program does not stop the
+simulation while waiting for a key press. On each frame, it checks whether a key was
+pressed, applies the action, and continues the calculation.
 
-### Работа и с файлом, и со stdin
+### Loading from a file or stdin
 
-Программа поддерживает два способа загрузки паттерна:
+The program supports two ways to load a pattern:
 
 ```bash
 ./a.out test2.txt
 ```
 
-и
+and
 
 ```bash
 ./a.out < test2.txt
 ```
 
-После чтения входных данных программа заново подключается к `/dev/tty`, чтобы `ncurses`
-мог читать клавиши из терминала даже тогда, когда начальное поле было передано через
-перенаправление `stdin`.
+After reading the input, the program reconnects to `/dev/tty` so that `ncurses` can
+read keys from the terminal even when the initial grid was provided through redirected
+`stdin`.
 
-## Требования
+## Requirements
 
-- C-компилятор, например `gcc`;
-- библиотека `ncurses`;
-- терминал размером не меньше `80x26` символов.
+- a C compiler, such as `gcc`;
+- the `ncurses` library;
+- a terminal at least `80x26` characters in size.
 
-На macOS `ncurses` обычно уже доступен. На Linux при необходимости его можно установить
-через пакетный менеджер, например `libncurses-dev` или `ncurses-devel`.
+On macOS, `ncurses` is usually available already. On Linux, install it with your package
+manager if needed, for example with `libncurses-dev` or `ncurses-devel`.
 
-## Сборка
+## Build
 
-В корне проекта выполните:
+From the project root, run:
 
 ```bash
 gcc game_of_life.c -lncurses
 ```
 
-После сборки появится исполняемый файл `a.out`.
+This creates an executable named `a.out`.
 
-Для более строгой проверки можно собрать с предупреждениями:
+For a stricter build with warnings enabled, run:
 
 ```bash
 gcc -Wall -Wextra -Werror game_of_life.c -lncurses
 ```
 
-## Запуск
+## Run
 
-Запуск с готовым паттерном:
+Run with a ready-made pattern:
 
 ```bash
 ./a.out test1.txt
 ```
 
-Другие варианты:
+Other options:
 
 ```bash
 ./a.out test2.txt
@@ -133,28 +134,28 @@ gcc -Wall -Wextra -Werror game_of_life.c -lncurses
 ./a.out test5.txt
 ```
 
-Можно также передать поле через стандартный ввод:
+You can also pass the grid through standard input:
 
 ```bash
 ./a.out < test1.txt
 ```
 
-## Управление
+## Controls
 
-- `A` - ускорить симуляцию;
-- `Z` - замедлить симуляцию;
-- `Space` - выйти из программы.
+- `A` - speed up the simulation;
+- `Z` - slow down the simulation;
+- `Space` - exit the program.
 
-Текущая задержка между поколениями отображается в верхней строке терминала.
+The current delay between generations is shown on the terminal's top line.
 
-## Формат входного файла
+## Input file format
 
-Файл начального состояния состоит из 25 строк. Каждая строка описывает одну строку поля.
+The initial state file contains 25 lines. Each line describes one row of the grid.
 
-- `O` - живая клетка;
-- любой другой символ, например `.`, считается пустой клеткой.
+- `O` - a live cell;
+- any other character, such as `.`, is treated as an empty cell.
 
-Пример небольшого фрагмента:
+Example fragment:
 
 ```text
 ................................................................................
@@ -164,30 +165,31 @@ gcc -Wall -Wextra -Werror game_of_life.c -lncurses
 ................................................................................
 ```
 
-Поле в проекте рассчитано на 80 символов в строке и 25 строк. Если строка короче,
-оставшиеся клетки считаются пустыми.
+The project grid is 80 characters wide and 25 lines tall. If a line is shorter, the
+remaining cells are treated as empty.
 
-## Как должна работать программа
+## Program behavior
 
-После запуска программа считывает начальное поле, открывает полноэкранный режим
-терминала и начинает обновлять поколения. Живые клетки отображаются символом `O`,
-пустые клетки - пробелом. На каждом шаге программа:
+After launch, the program reads the initial grid, switches the terminal to full-screen
+mode, and starts updating generations. Live cells are displayed as `O` and empty cells
+as spaces. At each step, the program:
 
-1. очищает экран;
-2. рисует строку статуса и поле;
-3. проверяет нажатые клавиши;
-4. рассчитывает следующее поколение;
-5. делает паузу с текущей задержкой.
+1. clears the screen;
+2. draws the status line and the grid;
+3. checks for key presses;
+4. calculates the next generation;
+5. pauses for the current delay.
 
-Если программа сразу завершается, проверьте размер окна терминала: нужен экран
-минимум `80x26`, потому что 25 строк занимает поле и еще 1 строка нужна для статуса.
+If the program exits immediately, check the terminal window size: it must be at least
+`80x26`, because the grid uses 25 lines and the status line needs one more.
 
-## Структура проекта
+## Project structure
 
 ```text
 .
 ├── game_of_life.c
 ├── README.md
+├── README_RUS.md
 ├── test1.txt
 ├── test2.txt
 ├── test3.txt
@@ -198,15 +200,15 @@ gcc -Wall -Wextra -Werror game_of_life.c -lncurses
     └── game-of-life-running.png
 ```
 
-## Команда
+## Team
 
-Проект выполнен командой из двух человек в рамках School 21.
+This project was completed by a team of two as part of School 21.
 
-Роли в команде:
+Team roles:
 
 - Team Lead;
 - Developer.
 
-Оба участника имели опыт программирования, поэтому работа была распределена вокруг
-проектирования логики, реализации терминального интерфейса, подготовки паттернов и
-проверки корректности поведения симуляции.
+Both team members had programming experience, so the work was organized around
+designing the logic, implementing the terminal interface, preparing patterns, and
+checking the simulation's behavior.
